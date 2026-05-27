@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 15 23 42;
+    --foreground: 248 250 252;
+  }
+
+  body {
+    @apply bg-dark-950 text-dark-50 antialiased;
+  }
+
+  * {
+    @apply border-dark-700/50;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-500;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-dark-800/40 backdrop-blur-xl border border-dark-700/50 rounded-2xl shadow-glass;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:bg-dark-800/60 hover:border-brand-500/30 hover:shadow-glow;
+  }
+
+  .glass-button {
+    @apply px-4 py-2 rounded-xl bg-dark-800/60 backdrop-blur-sm border border-dark-700/50 
+           text-dark-200 hover:bg-dark-700/60 hover:border-brand-500/30 
+           transition-all duration-200 font-medium;
+  }
+
+  .glass-input {
+    @apply w-full px-4 py-3 rounded-xl bg-dark-800/40 backdrop-blur-sm border border-dark-700/50 
+           text-dark-100 placeholder-dark-500 
+           focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 
+           transition-all duration-200;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-purple-400;
+  }
+
+  .gradient-border {
+    @apply relative;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+                linear-gradient(135deg, #6366f1, #a855f7, #6366f1) border-box;
+    border: 1px solid transparent;
+  }
+
+  .stat-card {
+    @apply glass-card p-6 flex flex-col gap-2;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-dark-400 
+           hover:text-dark-100 hover:bg-dark-800/60 
+           transition-all duration-200 font-medium;
+  }
+
+  .sidebar-link-active {
+    @apply sidebar-link text-brand-400 bg-brand-500/10 border border-brand-500/20;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 
+           text-white font-semibold shadow-lg shadow-brand-500/25 
+           hover:shadow-brand-500/40 hover:from-brand-500 hover:to-brand-400 
+           active:scale-[0.98] transition-all duration-200;
+  }
+
+  .btn-secondary {
+    @apply glass-button;
+  }
+
+  .btn-danger {
+    @apply px-6 py-3 rounded-xl bg-red-500/20 border border-red-500/30 
+           text-red-400 font-semibold 
+           hover:bg-red-500/30 hover:border-red-500/50 
+           transition-all duration-200;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-500/20 text-amber-400 border border-amber-500/30;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-500/20 text-red-400 border border-red-500/30;
+  }
+
+  .badge-info {
+    @apply badge bg-blue-500/20 text-blue-400 border border-blue-500/30;
+  }
+
+  .badge-neutral {
+    @apply badge bg-dark-600/50 text-dark-300 border border-dark-600/50;
+  }
+
+  .table-header {
+    @apply px-6 py-4 text-left text-xs font-semibold text-dark-400 uppercase tracking-wider;
+  }
+
+  .table-cell {
+    @apply px-6 py-4 text-sm text-dark-200;
+  }
+
+  .table-row {
+    @apply border-b border-dark-700/30 hover:bg-dark-800/40 transition-colors;
+  }
+}
