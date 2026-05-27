@@ -50,8 +50,9 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     if (search) {
+      const sanitized = (search as string).replace(/[,.*()]/g, '');
       query = query.or(
-        `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,company.ilike.%${search}%`
+        `first_name.ilike.%${sanitized}%,last_name.ilike.%${sanitized}%,email.ilike.%${sanitized}%,phone.ilike.%${sanitized}%,company.ilike.%${sanitized}%`
       );
     }
 
