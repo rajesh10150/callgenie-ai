@@ -7,53 +7,81 @@ import CallsChart from '@/components/dashboard/CallsChart';
 import SentimentChart from '@/components/dashboard/SentimentChart';
 import RecentCalls from '@/components/dashboard/RecentCalls';
 import ActiveCampaigns from '@/components/dashboard/ActiveCampaigns';
+import { useApiData } from '@/hooks/useApiData';
+import type { DashboardOverview } from '@/types';
 
-const stats = [
-  {
-    title: 'Total Calls',
-    value: '2,847',
-    icon: Phone,
-    trend: { value: 12.5, isPositive: true },
-    subtitle: 'Last 30 days',
+interface DashboardResponse {
+  overview: DashboardOverview;
+}
+
+const fallbackData: DashboardResponse = {
+  overview: {
+    total_calls: 2847,
+    total_leads: 1234,
+    total_campaigns: 12,
+    qualified_leads: 567,
+    appointments_booked: 89,
+    answer_rate: 72,
+    qualification_rate: 35.2,
   },
-  {
-    title: 'Active Leads',
-    value: '1,234',
-    icon: Users,
-    trend: { value: 8.2, isPositive: true },
-    subtitle: '567 qualified',
-  },
-  {
-    title: 'Campaigns',
-    value: '12',
-    icon: Megaphone,
-    trend: { value: 3, isPositive: true },
-    subtitle: '3 active',
-  },
-  {
-    title: 'Appointments',
-    value: '89',
-    icon: CalendarCheck,
-    trend: { value: 15.3, isPositive: true },
-    subtitle: 'This month',
-  },
-  {
-    title: 'Answer Rate',
-    value: '72%',
-    icon: TrendingUp,
-    trend: { value: 2.1, isPositive: true },
-    subtitle: 'vs 68% last month',
-  },
-  {
-    title: 'Total Spend',
-    value: '$1,245',
-    icon: DollarSign,
-    trend: { value: 5.2, isPositive: false },
-    subtitle: 'This billing cycle',
-  },
-];
+};
+
+function formatNumber(n: number): string {
+  return n.toLocaleString();
+}
 
 export default function DashboardPage() {
+  const { data } = useApiData<DashboardResponse>({
+    endpoint: '/analytics/dashboard',
+    fallback: fallbackData,
+  });
+  const overview = data.overview;
+
+  const stats = [
+    {
+      title: 'Total Calls',
+      value: formatNumber(overview.total_calls),
+      icon: Phone,
+      trend: { value: 12.5, isPositive: true },
+      subtitle: 'Last 30 days',
+    },
+    {
+      title: 'Active Leads',
+      value: formatNumber(overview.total_leads),
+      icon: Users,
+      trend: { value: 8.2, isPositive: true },
+      subtitle: `${formatNumber(overview.qualified_leads)} qualified`,
+    },
+    {
+      title: 'Campaigns',
+      value: String(overview.total_campaigns),
+      icon: Megaphone,
+      trend: { value: 3, isPositive: true },
+      subtitle: '3 active',
+    },
+    {
+      title: 'Appointments',
+      value: String(overview.appointments_booked),
+      icon: CalendarCheck,
+      trend: { value: 15.3, isPositive: true },
+      subtitle: 'This month',
+    },
+    {
+      title: 'Answer Rate',
+      value: `${overview.answer_rate}%`,
+      icon: TrendingUp,
+      trend: { value: 2.1, isPositive: true },
+      subtitle: 'vs 68% last month',
+    },
+    {
+      title: 'Total Spend',
+      value: '$1,245',
+      icon: DollarSign,
+      trend: { value: 5.2, isPositive: false },
+      subtitle: 'This billing cycle',
+    },
+  ];
+
   return (
     <div>
       <Header

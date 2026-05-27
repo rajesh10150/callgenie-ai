@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Phone, Mail, Lock, User, Building2, ArrowRight } from 'lucide-react';
+import { Phone, Mail, Lock, User, Building2, ArrowRight, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -13,11 +14,11 @@ export default function RegisterPage() {
     org_name: '',
     industry: 'real_estate',
   });
+  const { register, loading, error, clearError } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In production, call auth API
-    window.location.href = '/dashboard';
+    await register(formData);
   };
 
   const updateField = (field: string, value: string) => {
@@ -49,6 +50,15 @@ export default function RegisterPage() {
         <h2 className="text-xl font-semibold text-center text-dark-100 mb-2">Create your account</h2>
         <p className="text-dark-400 text-center text-sm mb-8">Start your free trial — no credit card required</p>
 
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <p className="text-sm text-red-400">{error}</p>
+            <button onClick={clearError} className="text-xs text-red-300 underline mt-1">
+              Dismiss
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm text-dark-300 mb-1 block">Full Name</label>
@@ -61,6 +71,7 @@ export default function RegisterPage() {
                 placeholder="John Doe"
                 className="glass-input !pl-10"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -76,6 +87,7 @@ export default function RegisterPage() {
                 placeholder="you@company.com"
                 className="glass-input !pl-10"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -92,6 +104,7 @@ export default function RegisterPage() {
                 className="glass-input !pl-10"
                 minLength={8}
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -107,6 +120,7 @@ export default function RegisterPage() {
                 placeholder="Your company name"
                 className="glass-input !pl-10"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -117,6 +131,7 @@ export default function RegisterPage() {
               value={formData.industry}
               onChange={(e) => updateField('industry', e.target.value)}
               className="glass-input"
+              disabled={loading}
             >
               <option value="real_estate">Real Estate</option>
               <option value="insurance">Insurance</option>
@@ -128,9 +143,22 @@ export default function RegisterPage() {
             </select>
           </div>
 
-          <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2">
-            Create Account
-            <ArrowRight className="w-4 h-4" />
+          <button
+            type="submit"
+            className="btn-primary w-full flex items-center justify-center gap-2"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              <>
+                Create Account
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
 

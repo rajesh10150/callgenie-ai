@@ -6,6 +6,7 @@ import { Plus, Search, Filter, Megaphone, Play, Pause, MoreVertical, Users, Phon
 import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
 import { formatPercentage, LANGUAGES, AI_MODELS } from '@/lib/utils';
+import { useApiData } from '@/hooks/useApiData';
 
 interface CampaignData {
   id: string;
@@ -22,7 +23,7 @@ interface CampaignData {
   created_at: string;
 }
 
-const mockCampaigns: CampaignData[] = [
+const fallbackCampaigns: CampaignData[] = [
   {
     id: '1', name: 'Q1 Real Estate Outreach', status: 'active', type: 'cold_call',
     language: 'en', ai_model: 'gpt-4.1', total_leads: 500, calls_made: 325,
@@ -58,8 +59,12 @@ const mockCampaigns: CampaignData[] = [
 export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const { data: campaigns } = useApiData<CampaignData[]>({
+    endpoint: '/campaigns',
+    fallback: fallbackCampaigns,
+  });
 
-  const filteredCampaigns = mockCampaigns.filter(c => {
+  const filteredCampaigns = campaigns.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchesSearch && matchesStatus;
