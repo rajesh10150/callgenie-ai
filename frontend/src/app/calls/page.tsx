@@ -6,8 +6,9 @@ import { Search, Filter, Phone, Clock, ThumbsUp, ThumbsDown, Minus, PlayCircle, 
 import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
 import { formatDuration, formatDateTime } from '@/lib/utils';
+import { useApiData } from '@/hooks/useApiData';
 
-const mockCalls = [
+const fallbackCalls = [
   { id: '1', lead_name: 'Priya Sharma', phone: '+91 98765 43210', campaign: 'Q1 Real Estate', status: 'completed', duration: 245, sentiment: 'positive', qualified: true, ai_model: 'GPT-4.1', cost: 0.42, created_at: '2024-02-15T10:30:00Z' },
   { id: '2', lead_name: 'Rahul Kumar', phone: '+91 87654 32109', campaign: 'Insurance Outreach', status: 'completed', duration: 180, sentiment: 'neutral', qualified: false, ai_model: 'Gemini', cost: 0.28, created_at: '2024-02-15T10:25:00Z' },
   { id: '3', lead_name: 'Aisha Begum', phone: '+91 76543 21098', campaign: 'Q1 Real Estate', status: 'no_answer', duration: 0, sentiment: 'neutral', qualified: false, ai_model: 'GPT-4.1', cost: 0.05, created_at: '2024-02-15T10:20:00Z' },
@@ -27,8 +28,12 @@ const sentimentConfig = {
 export default function CallsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const { data: calls } = useApiData<typeof fallbackCalls>({
+    endpoint: '/calls',
+    fallback: fallbackCalls,
+  });
 
-  const filteredCalls = mockCalls.filter(c => {
+  const filteredCalls = calls.filter(c => {
     const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.campaign.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;

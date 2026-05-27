@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Phone, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Phone, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const { login, loading, error, clearError } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In production, call auth API
-    window.location.href = '/dashboard';
+    await login(email, password);
   };
 
   return (
@@ -40,6 +41,15 @@ export default function LoginPage() {
         <h2 className="text-xl font-semibold text-center text-dark-100 mb-2">Welcome back</h2>
         <p className="text-dark-400 text-center text-sm mb-8">Sign in to your account</p>
 
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <p className="text-sm text-red-400">{error}</p>
+            <button onClick={clearError} className="text-xs text-red-300 underline mt-1">
+              Dismiss
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm text-dark-300 mb-1 block">Email</label>
@@ -52,6 +62,7 @@ export default function LoginPage() {
                 placeholder="you@company.com"
                 className="glass-input !pl-10"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -70,13 +81,27 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 className="glass-input !pl-10"
                 required
+                disabled={loading}
               />
             </div>
           </div>
 
-          <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2">
-            Sign In
-            <ArrowRight className="w-4 h-4" />
+          <button
+            type="submit"
+            className="btn-primary w-full flex items-center justify-center gap-2"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              <>
+                Sign In
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
 

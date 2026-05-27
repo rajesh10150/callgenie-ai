@@ -7,8 +7,9 @@ import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import { formatDate } from '@/lib/utils';
+import { useApiData } from '@/hooks/useApiData';
 
-const mockLeads = [
+const fallbackLeads = [
   { id: '1', first_name: 'Priya', last_name: 'Sharma', email: 'priya@example.com', phone: '+91 98765 43210', company: 'Sharma Realty', status: 'qualified', score: 85, source: 'csv_import', created_at: '2024-01-15T10:30:00Z' },
   { id: '2', first_name: 'Rahul', last_name: 'Kumar', email: 'rahul@example.com', phone: '+91 87654 32109', company: 'Kumar Insurance', status: 'contacted', score: 62, source: 'manual', created_at: '2024-01-18T14:20:00Z' },
   { id: '3', first_name: 'Aisha', last_name: 'Begum', email: 'aisha@example.com', phone: '+91 76543 21098', company: 'City Clinic', status: 'new', score: 45, source: 'webhook', created_at: '2024-01-20T09:15:00Z' },
@@ -19,13 +20,17 @@ const mockLeads = [
   { id: '8', first_name: 'Karthik', last_name: 'Iyer', email: 'karthik@example.com', phone: '+91 21098 76543', company: 'Iyer Tech', status: 'qualified', score: 88, source: 'csv_import', created_at: '2024-02-05T15:10:00Z' },
 ];
 
-type LeadRecord = typeof mockLeads[0] & Record<string, unknown>;
+type LeadRecord = typeof fallbackLeads[0] & Record<string, unknown>;
 
 export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const { data: leads } = useApiData<typeof fallbackLeads>({
+    endpoint: '/leads',
+    fallback: fallbackLeads,
+  });
 
-  const filteredLeads = mockLeads.filter(l => {
+  const filteredLeads = leads.filter(l => {
     const matchesSearch =
       `${l.first_name} ${l.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       l.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -108,10 +113,10 @@ export default function LeadsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total Leads', value: mockLeads.length, icon: Building2 },
-          { label: 'Qualified', value: mockLeads.filter(l => l.status === 'qualified').length, icon: Star },
-          { label: 'Converted', value: mockLeads.filter(l => l.status === 'converted').length, icon: PhoneIcon },
-          { label: 'Avg Score', value: Math.round(mockLeads.reduce((s, l) => s + l.score, 0) / mockLeads.length), icon: Star },
+          { label: 'Total Leads', value: leads.length, icon: Building2 },
+          { label: 'Qualified', value: leads.filter(l => l.status === 'qualified').length, icon: Star },
+          { label: 'Converted', value: leads.filter(l => l.status === 'converted').length, icon: PhoneIcon },
+          { label: 'Avg Score', value: leads.length > 0 ? Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length) : 0, icon: Star },
         ].map((stat, i) => (
           <motion.div
             key={i}
