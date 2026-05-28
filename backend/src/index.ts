@@ -19,7 +19,7 @@ import webhookRoutes from './routes/webhooks';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.cors.origin, credentials: true }));
+app.use(cors({ origin: config.cors.origins, credentials: true }));
 app.use(morgan('combined'));
 
 app.use('/api/v1/webhooks', express.urlencoded({ extended: true }));
@@ -57,7 +57,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use(errorHandler);
 
-app.listen(config.port, () => {
+app.listen(config.port, '0.0.0.0', () => {
   console.log(`CallGenie AI Backend running on port ${config.port}`);
   console.log(`Environment: ${config.nodeEnv}`);
   console.log(`Health check: http://localhost:${config.port}/api/health`);
