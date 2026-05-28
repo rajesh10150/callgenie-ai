@@ -18,8 +18,27 @@ import webhookRoutes from './routes/webhooks';
 
 const app = express();
 
-app.use(helmet());
-app.use(cors({ origin: config.cors.origins, credentials: true }));
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || config.cors.origins.includes(origin) || config.cors.origins.includes('*')) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, true);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: false,
+}));
 app.use(morgan('combined'));
 
 app.use('/api/v1/webhooks', express.urlencoded({ extended: true }));
