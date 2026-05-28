@@ -1,7 +1,10 @@
 import { Router, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../config/supabase';
+import { config } from '../config';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { sendSuccess, sendError, parsePagination } from '../utils/response';
+import { voiceEngine } from '../services/voiceEngine';
 
 const router = Router();
 
@@ -123,16 +126,50 @@ router.post('/initiate', async (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
-    // In production, this would trigger the Twilio call via the voice service
+    const callId = uuidv4();
+    const baseUrl = config.cors.origins.find(o => !o.includes('localhost')) || config.cors.origins[0];
+    const webhookBase = process.env.BACKEND_PUBLIC_URL || baseUrl;
+
+    const { callSid, status } = await voiceEngine.initiateCall({
+      to: lead.phone,
+      from: config.twilio.phoneNumber,
+      webhookUrl: `${webhookBase}/api/v1/webhooks/twilio/voice`,
+      recordingEnabled: true,
+      voicemailDetection: true,
+      timeout: 30,
+    });
+
+    const { data: callRecord, error: insertError } = await supabaseAdmin
+      .from('calls')
+      .insert({
+        id: callId,
+        org_id: req.user!.orgId,
+        campaign_id,
+        lead_id,
+        twilio_call_sid: callSid,
+        status: status === 'demo_mode' ? 'demo' : 'queued',
+        direction: 'outbound',
+        started_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      sendError(res, 'DB_ERROR', insertError.message);
+      return;
+    }
+
     sendSuccess(res, {
       message: 'Call initiated',
-      call_id: 'pending',
+      call_id: callRecord.id,
+      twilio_call_sid: callSid,
       lead_id,
       campaign_id,
-      status: 'queued',
+      status: callRecord.status,
     }, 202);
-  } catch {
-    sendError(res, 'INTERNAL_ERROR', 'Failed to initiate call', 500);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to initiate call';
+    sendError(res, 'INTERNAL_ERROR', message, 500);
   }
 });
 
