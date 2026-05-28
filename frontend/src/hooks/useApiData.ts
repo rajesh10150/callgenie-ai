@@ -33,10 +33,12 @@ export function useApiData<T>({ endpoint, fallback, enabled = true }: UseApiData
         setData(res.data);
         setIsUsingFallback(false);
       } else {
+        setError(res.error?.message || 'Request failed');
         setData(fallback);
         setIsUsingFallback(true);
       }
     } catch {
+      setError('Unable to connect to server');
       setData(fallback);
       setIsUsingFallback(true);
     } finally {

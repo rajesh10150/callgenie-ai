@@ -32,6 +32,7 @@ interface RegisterData {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register'];
+const AUTH_PATHS = ['/auth/login', '/auth/register'];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -78,6 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           token,
           loading: false,
         });
+        if (AUTH_PATHS.includes(pathname)) {
+          router.push('/dashboard');
+        }
       } else {
         localStorage.removeItem('callgenie_token');
         api.clearToken();
@@ -90,6 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('callgenie_token');
       api.clearToken();
       setAuth({ loading: false });
+      if (!PUBLIC_PATHS.includes(pathname)) {
+        router.push('/auth/login');
+      }
     }
   };
 
