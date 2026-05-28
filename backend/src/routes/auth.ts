@@ -86,7 +86,8 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
       organization: { id: orgId, name: org_name, slug },
       token: session?.session?.access_token,
     }, 201);
-  } catch {
+  } catch (err) {
+    console.error('Registration error:', err);
     sendError(res, 'INTERNAL_ERROR', 'Registration failed', 500);
   }
 });
@@ -121,7 +122,8 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
       token: data.session.access_token,
       refresh_token: data.session.refresh_token,
     });
-  } catch {
+  } catch (err) {
+    console.error('Login error:', err);
     sendError(res, 'INTERNAL_ERROR', 'Login failed', 500);
   }
 });
@@ -149,7 +151,8 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: Response)
       organization: membership?.organizations,
       role: membership?.role,
     });
-  } catch {
+  } catch (err) {
+    console.error('Profile fetch error:', err);
     sendError(res, 'INTERNAL_ERROR', 'Failed to fetch profile', 500);
   }
 });
@@ -171,7 +174,8 @@ router.put('/me', authenticate, async (req: AuthenticatedRequest, res: Response)
     }
 
     sendSuccess(res, data);
-  } catch {
+  } catch (err) {
+    console.error('Profile update error:', err);
     sendError(res, 'INTERNAL_ERROR', 'Failed to update profile', 500);
   }
 });
