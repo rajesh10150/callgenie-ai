@@ -1,5 +1,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import { config } from './index';
+
+const realtimeOptions = {
+  realtime: {
+    params: { eventsPerSecond: 0 },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    transport: WebSocket as any,
+  },
+};
 
 let _supabaseAdmin: SupabaseClient | null = null;
 
@@ -18,6 +27,7 @@ function getSupabaseAdmin(): SupabaseClient {
           autoRefreshToken: false,
           persistSession: false,
         },
+        ...realtimeOptions,
       }
     );
   }
@@ -44,5 +54,6 @@ export const createSupabaseClient = (accessToken: string) => {
         Authorization: `Bearer ${accessToken}`,
       },
     },
+    ...realtimeOptions,
   });
 };
