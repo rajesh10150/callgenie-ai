@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import { supabaseAdmin } from '../config/supabase';
+import { supabaseAdmin, getSupabaseAnon } from '../config/supabase';
 import { validate } from '../middleware/validate';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
 import { sendSuccess, sendError } from '../utils/response';
@@ -28,7 +28,7 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
   const { email, password, full_name, org_name, industry } = req.body;
 
   try {
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    let { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -36,11 +36,28 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
     });
 
     if (authError) {
-      sendError(res, 'AUTH_ERROR', authError.message);
-      return;
+      if (authError.message.includes('already been registered')) {
+        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+        const existing = users.find(u => u.email === email);
+        if (existing) {
+          const { data: dbUser } = await supabaseAdmin.from('users').select('id').eq('id', existing.id).single();
+          if (!dbUser) {
+            await supabaseAdmin.auth.admin.deleteUser(existing.id);
+            const retry = await supabaseAdmin.auth.admin.createUser({
+              email, password, email_confirm: true, user_metadata: { full_name },
+            });
+            authData = retry.data;
+            authError = retry.error;
+          }
+        }
+      }
+      if (authError) {
+        sendError(res, 'AUTH_ERROR', authError.message);
+        return;
+      }
     }
 
-    const userId = authData.user.id;
+    const userId = authData.user!.id;
     const orgId = uuidv4();
     const slug = org_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -51,6 +68,7 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
     });
 
     if (userError) {
+      await supabaseAdmin.auth.admin.deleteUser(userId);
       sendError(res, 'DB_ERROR', userError.message);
       return;
     }
@@ -65,18 +83,26 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
     });
 
     if (orgError) {
+      await supabaseAdmin.auth.admin.deleteUser(userId);
       sendError(res, 'DB_ERROR', orgError.message);
       return;
     }
 
-    await supabaseAdmin.from('org_members').insert({
+    const { error: memberError } = await supabaseAdmin.from('org_members').insert({
       id: uuidv4(),
       org_id: orgId,
       user_id: userId,
       role: 'owner',
     });
 
-    const { data: session } = await supabaseAdmin.auth.signInWithPassword({
+    if (memberError) {
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+      sendError(res, 'DB_ERROR', memberError.message);
+      return;
+    }
+
+    const anonClient = getSupabaseAnon();
+    const { data: session } = await anonClient.auth.signInWithPassword({
       email,
       password,
     });
@@ -96,7 +122,8 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
   const { email, password } = req.body;
 
   try {
-    const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password });
+    const anonClient = getSupabaseAnon();
+    const { data, error } = await anonClient.auth.signInWithPassword({ email, password });
 
     if (error) {
       sendError(res, 'AUTH_ERROR', 'Invalid email or password', 401);

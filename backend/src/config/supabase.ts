@@ -42,6 +42,26 @@ export const supabaseAdmin = new Proxy({} as SupabaseClient, {
   },
 });
 
+let _supabaseAnon: SupabaseClient | null = null;
+
+export function getSupabaseAnon(): SupabaseClient {
+  if (!_supabaseAnon) {
+    if (!config.supabase.url || !config.supabase.anonKey) {
+      throw new Error(
+        'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.'
+      );
+    }
+    _supabaseAnon = createClient(config.supabase.url, config.supabase.anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      ...realtimeOptions,
+    });
+  }
+  return _supabaseAnon;
+}
+
 export const createSupabaseClient = (accessToken: string) => {
   if (!config.supabase.url || !config.supabase.anonKey) {
     throw new Error(
