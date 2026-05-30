@@ -1,13 +1,76 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Upload, Download, Filter, Mail, Phone as PhoneIcon, Building2, Star } from 'lucide-react';
+import { Plus, Search, Upload, Download, Filter, Mail, Phone as PhoneIcon, Building2, Star, Loader2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
+import Modal from '@/components/ui/Modal';
 import { formatDate } from '@/lib/utils';
 import { useApiData } from '@/hooks/useApiData';
+import api from '@/lib/api';
+
+function parseCsv(text: string): Record<string, string>[] {
+  const rows: string[][] = [];
+  let field = '';
+  let row: string[] = [];
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += char;
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field); field = '';
+    } else if (char === '\n' || char === '\r') {
+      if (char === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.some(c => c.trim() !== '')) rows.push(row);
+      row = [];
+    } else field += char;
+  }
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    if (row.some(c => c.trim() !== '')) rows.push(row);
+  }
+  if (rows.length < 2) return [];
+
+  const normalize = (h: string) => h.trim().toLowerCase().replace(/\s+/g, '_');
+  const headers = rows[0].map(normalize);
+  return rows.slice(1).map(cols => {
+    const obj: Record<string, string> = {};
+    headers.forEach((h, idx) => { obj[h] = (cols[idx] ?? '').trim(); });
+    return obj;
+  });
+}
+
+function mapCsvRow(r: Record<string, string>) {
+  const first = r.first_name || r.firstname || (r.name ? r.name.split(' ')[0] : '') || '';
+  const last = r.last_name || r.lastname || (r.name ? r.name.split(' ').slice(1).join(' ') : '') || '';
+  return {
+    first_name: first,
+    last_name: last,
+    email: r.email || '',
+    phone: r.phone || r.phone_number || r.mobile || '',
+    company: r.company || r.organization || '',
+    title: r.title || '',
+  };
+}
+
+interface LeadForm {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  company: string;
+}
+
+const emptyForm: LeadForm = { first_name: '', last_name: '', email: '', phone: '', company: '' };
 
 const fallbackLeads = [
   { id: '1', first_name: 'Priya', last_name: 'Sharma', email: 'priya@example.com', phone: '+91 98765 43210', company: 'Sharma Realty', status: 'qualified', score: 85, source: 'csv_import', created_at: '2024-01-15T10:30:00Z' },
@@ -25,10 +88,101 @@ type LeadRecord = typeof fallbackLeads[0] & Record<string, unknown>;
 export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const { data: leads } = useApiData<typeof fallbackLeads>({
+  const { data: leads, refetch } = useApiData<typeof fallbackLeads>({
     endpoint: '/leads',
     fallback: fallbackLeads,
   });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState<LeadForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const flash = (type: 'success' | 'error', text: string) => {
+    setNotice({ type, text });
+    setTimeout(() => setNotice(null), 5000);
+  };
+
+  const handleExport = () => {
+    const cols = ['first_name', 'last_name', 'email', 'phone', 'company', 'status', 'score', 'source', 'created_at'];
+    const escape = (v: unknown) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [
+      cols.join(','),
+      ...filteredLeads.map(l => cols.map(c => escape((l as Record<string, unknown>)[c])).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    flash('success', `Exported ${filteredLeads.length} lead(s) to CSV`);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      e.target.value = '';
+      setImporting(true);
+      try {
+        const text = await file.text();
+        const parsed = parseCsv(text).map(mapCsvRow).filter(l => l.first_name && l.phone);
+        if (parsed.length === 0) {
+          flash('error', 'No valid rows found. CSV needs first_name and phone columns.');
+          return;
+        }
+        const res = await api.post<{ imported: number; total: number }>('/leads/import', { leads: parsed });
+        if (res.success) {
+          flash('success', `Imported ${res.data.imported} of ${parsed.length} lead(s)`);
+          refetch();
+        } else {
+          flash('error', res.error?.message || 'Import failed');
+        }
+      } catch {
+        flash('error', 'Unable to import CSV. Check the file and your connection.');
+      } finally {
+        setImporting(false);
+      }
+    }
+  };
+
+  const handleAddLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.first_name.trim() || form.phone.trim().length < 10) {
+      flash('error', 'First name and a valid phone (10+ digits) are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim() || undefined,
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim(),
+        company: form.company.trim() || undefined,
+        source: 'manual' as const,
+      };
+      const res = await api.post('/leads', payload);
+      if (res.success) {
+        flash('success', `Added ${payload.first_name}`);
+        setAddOpen(false);
+        setForm(emptyForm);
+        refetch();
+      } else {
+        flash('error', res.error?.message || 'Failed to add lead');
+      }
+    } catch {
+      flash('error', 'Unable to connect to server. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredLeads = leads.filter(l => {
     const matchesSearch =
@@ -167,20 +321,49 @@ export default function LeadsPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-secondary flex items-center gap-2 text-sm">
-            <Upload className="w-4 h-4" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-60"
+          >
+            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             Import CSV
           </button>
-          <button className="btn-secondary flex items-center gap-2 text-sm">
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
             <Download className="w-4 h-4" />
             Export
           </button>
-          <button className="btn-primary flex items-center gap-2 text-sm">
+          <button
+            onClick={() => setAddOpen(true)}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
             <Plus className="w-4 h-4" />
             Add Lead
           </button>
         </div>
       </div>
+
+      {notice && (
+        <div
+          className={`mb-4 px-4 py-3 rounded-xl text-sm border ${
+            notice.type === 'success'
+              ? 'bg-green-500/10 border-green-500/30 text-green-400'
+              : 'bg-red-500/10 border-red-500/30 text-red-400'
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
 
       {/* Table */}
       <DataTable<LeadRecord>
@@ -188,6 +371,82 @@ export default function LeadsPage() {
         data={filteredLeads as LeadRecord[]}
         emptyMessage="No leads found. Import a CSV or add leads manually."
       />
+
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Lead">
+        <form onSubmit={handleAddLead} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-dark-400 mb-1">First Name *</label>
+              <input
+                type="text"
+                value={form.first_name}
+                onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+                className="glass-input !py-2 text-sm"
+                placeholder="Priya"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-dark-400 mb-1">Last Name</label>
+              <input
+                type="text"
+                value={form.last_name}
+                onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+                className="glass-input !py-2 text-sm"
+                placeholder="Sharma"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="glass-input !py-2 text-sm"
+              placeholder="priya@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Phone *</label>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              className="glass-input !py-2 text-sm"
+              placeholder="+91 98765 43210"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Company</label>
+            <input
+              type="text"
+              value={form.company}
+              onChange={(e) => setForm({ ...form, company: e.target.value })}
+              className="glass-input !py-2 text-sm"
+              placeholder="Sharma Realty"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setAddOpen(false)}
+              className="btn-secondary text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn-primary flex items-center gap-2 text-sm disabled:opacity-60"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? 'Saving...' : 'Add Lead'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
