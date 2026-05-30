@@ -66,6 +66,16 @@ app.use('/api/v1/whatsapp', whatsappRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
 
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'CallGenie AI API',
+    status: 'ok',
+    version: '0.1.0',
+    docs: 'https://github.com/rajesh10150/callgenie-ai',
+    health: '/api/health',
+  });
+});
+
 app.get('/api/health', async (_req, res) => {
   const supabaseConfigured = !!(config.supabase.url && config.supabase.serviceRoleKey);
   let supabaseConnected = false;
