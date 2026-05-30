@@ -1,8 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CreditCard, Zap, Phone, Bot, Check, ArrowUpRight } from 'lucide-react';
+import { CreditCard, Phone, Bot, Check, ArrowUpRight, Loader2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import Notice from '@/components/ui/Notice';
+import { useNotice } from '@/hooks/useNotice';
+import api from '@/lib/api';
 
 const plans = [
   {
@@ -33,9 +37,31 @@ const plans = [
 ];
 
 export default function BillingPage() {
+  const { notice, flash } = useNotice();
+  const [busyPlan, setBusyPlan] = useState<string | null>(null);
+
+  const handleSubscribe = async (planName: string) => {
+    const plan = planName.toLowerCase();
+    setBusyPlan(plan);
+    try {
+      const res = await api.post<{ message: string; plan: string }>('/billing/subscribe', { plan });
+      if (res.success) {
+        flash('success', `Upgrade to ${planName} initiated. Our team will follow up to complete checkout.`);
+      } else {
+        flash('error', res.error?.message || 'Failed to start upgrade');
+      }
+    } catch {
+      flash('error', 'Unable to connect to server. Please try again.');
+    } finally {
+      setBusyPlan(null);
+    }
+  };
+
   return (
     <div>
       <Header title="Billing" subtitle="Manage your subscription and usage" />
+
+      <Notice notice={notice} />
 
       {/* Current Usage */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -114,8 +140,12 @@ export default function BillingPage() {
             <span className="text-2xl font-bold text-dark-100">$49</span>
             <span className="text-dark-500">/month</span>
           </div>
-          <button className="mt-4 btn-primary text-sm flex items-center gap-2">
-            <ArrowUpRight className="w-4 h-4" />
+          <button
+            onClick={() => handleSubscribe('Professional')}
+            disabled={busyPlan === 'professional'}
+            className="mt-4 btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
+          >
+            {busyPlan === 'professional' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUpRight className="w-4 h-4" />}
             Upgrade Plan
           </button>
         </motion.div>
@@ -151,10 +181,12 @@ export default function BillingPage() {
               ))}
             </ul>
             <button
-              className={`w-full ${plan.current ? 'btn-secondary' : 'btn-primary'} text-sm`}
-              disabled={plan.current}
+              onClick={() => !plan.current && plan.name !== 'Free' && handleSubscribe(plan.name)}
+              className={`w-full ${plan.current ? 'btn-secondary' : 'btn-primary'} text-sm flex items-center justify-center gap-2`}
+              disabled={plan.current || plan.name === 'Free' || busyPlan === plan.name.toLowerCase()}
             >
-              {plan.current ? 'Current' : 'Upgrade'}
+              {busyPlan === plan.name.toLowerCase() && <Loader2 className="w-4 h-4 animate-spin" />}
+              {plan.current ? 'Current' : plan.name === 'Free' ? 'Free' : 'Upgrade'}
             </button>
           </motion.div>
         ))}

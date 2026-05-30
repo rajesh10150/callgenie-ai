@@ -2,11 +2,15 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Filter, Megaphone, Play, Pause, MoreVertical, Users, Phone as PhoneIcon, TrendingUp } from 'lucide-react';
+import { Plus, Search, Filter, Megaphone, Play, Pause, MoreVertical, Users, Phone as PhoneIcon, TrendingUp, Trash2, Loader2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
+import Modal from '@/components/ui/Modal';
+import Notice from '@/components/ui/Notice';
 import { formatPercentage, LANGUAGES, AI_MODELS } from '@/lib/utils';
 import { useApiData } from '@/hooks/useApiData';
+import { useNotice } from '@/hooks/useNotice';
+import api from '@/lib/api';
 
 interface CampaignData {
   id: string;
@@ -56,13 +60,92 @@ const fallbackCampaigns: CampaignData[] = [
   },
 ];
 
+interface CampaignForm {
+  name: string;
+  type: string;
+  language: string;
+  ai_model: string;
+}
+
+const emptyForm: CampaignForm = { name: '', type: 'cold_call', language: 'en', ai_model: 'gpt-4.1' };
+
 export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const { data: campaigns } = useApiData<CampaignData[]>({
+  const { data: campaigns, refetch } = useApiData<CampaignData[]>({
     endpoint: '/campaigns',
     fallback: fallbackCampaigns,
   });
+  const { notice, flash } = useNotice();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState<CampaignForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      flash('error', 'Campaign name is required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api.post('/campaigns', {
+        name: form.name.trim(),
+        type: form.type,
+        language: form.language,
+        ai_model: form.ai_model,
+      });
+      if (res.success) {
+        flash('success', `Created "${form.name.trim()}"`);
+        setCreateOpen(false);
+        setForm(emptyForm);
+        refetch();
+      } else {
+        flash('error', res.error?.message || 'Failed to create campaign');
+      }
+    } catch {
+      flash('error', 'Unable to connect to server. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setStatus = async (campaign: CampaignData, action: 'start' | 'pause') => {
+    setBusyId(campaign.id);
+    try {
+      const res = await api.post(`/campaigns/${campaign.id}/${action}`);
+      if (res.success) {
+        flash('success', `${campaign.name} ${action === 'start' ? 'started' : 'paused'}`);
+        refetch();
+      } else {
+        flash('error', res.error?.message || `Failed to ${action} campaign`);
+      }
+    } catch {
+      flash('error', 'Unable to connect to server. Please try again.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (campaign: CampaignData) => {
+    setMenuId(null);
+    setBusyId(campaign.id);
+    try {
+      const res = await api.delete(`/campaigns/${campaign.id}`);
+      if (res.success) {
+        flash('success', `Deleted "${campaign.name}"`);
+        refetch();
+      } else {
+        flash('error', res.error?.message || 'Failed to delete campaign');
+      }
+    } catch {
+      flash('error', 'Unable to connect to server. Please try again.');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const filteredCampaigns = campaigns.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -73,6 +156,8 @@ export default function CampaignsPage() {
   return (
     <div>
       <Header title="Campaigns" subtitle="Manage your AI calling campaigns" />
+
+      <Notice notice={notice} />
 
       {/* Actions Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -103,7 +188,7 @@ export default function CampaignsPage() {
           </div>
         </div>
         <button
-          onClick={() => {}}
+          onClick={() => { setForm(emptyForm); setCreateOpen(true); }}
           className="btn-primary flex items-center gap-2 text-sm"
         >
           <Plus className="w-4 h-4" />
@@ -137,9 +222,28 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                 </div>
-                <button className="p-1 rounded-lg hover:bg-dark-700/50 transition-colors">
-                  <MoreVertical className="w-4 h-4 text-dark-500" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setMenuId(menuId === campaign.id ? null : campaign.id)}
+                    className="p-1 rounded-lg hover:bg-dark-700/50 transition-colors"
+                  >
+                    <MoreVertical className="w-4 h-4 text-dark-500" />
+                  </button>
+                  {menuId === campaign.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
+                      <div className="absolute right-0 top-full mt-1 w-40 glass-card p-1 z-20">
+                        <button
+                          onClick={() => handleDelete(campaign)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-dark-800/60 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Progress */}
@@ -194,20 +298,32 @@ export default function CampaignsPage() {
                   <span className="px-2 py-0.5 rounded bg-dark-700/50">{AI_MODELS[campaign.ai_model]?.label}</span>
                 </div>
                 {campaign.status === 'active' && (
-                  <button className="flex items-center gap-1 text-amber-400 hover:text-amber-300">
-                    <Pause className="w-3 h-3" />
+                  <button
+                    onClick={() => setStatus(campaign, 'pause')}
+                    disabled={busyId === campaign.id}
+                    className="flex items-center gap-1 text-amber-400 hover:text-amber-300 disabled:opacity-50"
+                  >
+                    {busyId === campaign.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
                     Pause
                   </button>
                 )}
                 {campaign.status === 'paused' && (
-                  <button className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300">
-                    <Play className="w-3 h-3" />
+                  <button
+                    onClick={() => setStatus(campaign, 'start')}
+                    disabled={busyId === campaign.id}
+                    className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
+                  >
+                    {busyId === campaign.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                     Resume
                   </button>
                 )}
                 {campaign.status === 'draft' && (
-                  <button className="flex items-center gap-1 text-brand-400 hover:text-brand-300">
-                    <Play className="w-3 h-3" />
+                  <button
+                    onClick={() => setStatus(campaign, 'start')}
+                    disabled={busyId === campaign.id}
+                    className="flex items-center gap-1 text-brand-400 hover:text-brand-300 disabled:opacity-50"
+                  >
+                    {busyId === campaign.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                     Start
                   </button>
                 )}
@@ -216,6 +332,70 @@ export default function CampaignsPage() {
           ))}
         </AnimatePresence>
       </div>
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New Campaign">
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <label className="block text-sm text-dark-300 mb-1">Campaign Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Q1 Real Estate Outreach"
+              className="glass-input w-full !py-2 text-sm"
+              autoFocus
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-dark-300 mb-1">Type</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+                className="glass-input w-full !py-2 text-sm"
+              >
+                <option value="cold_call">Cold Call</option>
+                <option value="follow_up">Follow Up</option>
+                <option value="appointment">Appointment</option>
+                <option value="survey">Survey</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-dark-300 mb-1">Language</label>
+              <select
+                value={form.language}
+                onChange={(e) => setForm({ ...form, language: e.target.value })}
+                className="glass-input w-full !py-2 text-sm"
+              >
+                {Object.entries(LANGUAGES).map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-dark-300 mb-1">AI Model</label>
+            <select
+              value={form.ai_model}
+              onChange={(e) => setForm({ ...form, ai_model: e.target.value })}
+              className="glass-input w-full !py-2 text-sm"
+            >
+              {Object.entries(AI_MODELS).map(([id, m]) => (
+                <option key={id} value={id}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setCreateOpen(false)} className="btn-secondary text-sm !py-2">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="btn-primary text-sm !py-2 flex items-center gap-2">
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Create Campaign
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -2,11 +2,15 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Phone, Clock, ThumbsUp, ThumbsDown, Minus, PlayCircle, FileText } from 'lucide-react';
+import { Search, Filter, Phone, Clock, ThumbsUp, ThumbsDown, Minus, PlayCircle, FileText, Loader2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
+import Modal from '@/components/ui/Modal';
+import Notice from '@/components/ui/Notice';
 import { formatDuration, formatDateTime } from '@/lib/utils';
 import { useApiData } from '@/hooks/useApiData';
+import { useNotice } from '@/hooks/useNotice';
+import api from '@/lib/api';
 
 const fallbackCalls = [
   { id: '1', lead_name: 'Priya Sharma', phone: '+91 98765 43210', campaign: 'Q1 Real Estate', status: 'completed', duration: 245, sentiment: 'positive', qualified: true, ai_model: 'GPT-4.1', cost: 0.42, created_at: '2024-02-15T10:30:00Z' },
@@ -25,6 +29,20 @@ const sentimentConfig = {
   negative: { icon: ThumbsDown, color: 'text-red-400', bg: 'bg-red-500/10' },
 };
 
+interface TranscriptEntry {
+  speaker?: string;
+  role?: string;
+  text?: string;
+  message?: string;
+  content?: string;
+}
+
+interface TranscriptData {
+  entries?: TranscriptEntry[];
+  summary?: string;
+  key_points?: string[];
+}
+
 export default function CallsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -32,6 +50,38 @@ export default function CallsPage() {
     endpoint: '/calls',
     fallback: fallbackCalls,
   });
+  const { notice, flash } = useNotice();
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcript, setTranscript] = useState<TranscriptData | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [transcriptName, setTranscriptName] = useState('');
+
+  const handlePlay = (call: { id: string } & Record<string, unknown>) => {
+    const url = call.recording_url as string | undefined;
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      flash('error', 'No recording available for this call.');
+    }
+  };
+
+  const handleTranscript = async (call: { id: string; lead_name: string }) => {
+    setLoadingId(call.id);
+    try {
+      const res = await api.get<TranscriptData>(`/calls/${call.id}/transcript`);
+      if (res.success && res.data && (res.data.entries?.length || res.data.summary)) {
+        setTranscript(res.data);
+        setTranscriptName(call.lead_name);
+        setTranscriptOpen(true);
+      } else {
+        flash('error', 'Transcript not available for this call.');
+      }
+    } catch {
+      flash('error', 'Transcript not available for this call.');
+    } finally {
+      setLoadingId(null);
+    }
+  };
 
   const filteredCalls = calls.filter(c => {
     const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -43,6 +93,8 @@ export default function CallsPage() {
   return (
     <div>
       <Header title="Call History" subtitle="View and analyze all AI-powered calls" />
+
+      <Notice notice={notice} />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -137,11 +189,22 @@ export default function CallsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    <button className="p-2 rounded-lg hover:bg-dark-700/50 transition-colors" title="Play recording">
+                    <button
+                      onClick={() => handlePlay(call as { id: string } & Record<string, unknown>)}
+                      className="p-2 rounded-lg hover:bg-dark-700/50 transition-colors"
+                      title="Play recording"
+                    >
                       <PlayCircle className="w-4 h-4 text-dark-400 hover:text-brand-400" />
                     </button>
-                    <button className="p-2 rounded-lg hover:bg-dark-700/50 transition-colors" title="View transcript">
-                      <FileText className="w-4 h-4 text-dark-400 hover:text-brand-400" />
+                    <button
+                      onClick={() => handleTranscript(call)}
+                      disabled={loadingId === call.id}
+                      className="p-2 rounded-lg hover:bg-dark-700/50 transition-colors disabled:opacity-50"
+                      title="View transcript"
+                    >
+                      {loadingId === call.id
+                        ? <Loader2 className="w-4 h-4 text-dark-400 animate-spin" />
+                        : <FileText className="w-4 h-4 text-dark-400 hover:text-brand-400" />}
                     </button>
                   </div>
                 </div>
@@ -150,6 +213,32 @@ export default function CallsPage() {
           );
         })}
       </div>
+
+      <Modal open={transcriptOpen} onClose={() => setTranscriptOpen(false)} title={`Transcript — ${transcriptName}`}>
+        <div className="max-h-[60vh] overflow-y-auto space-y-4">
+          {transcript?.summary && (
+            <div className="p-3 rounded-xl bg-dark-800/40 border border-dark-700/30">
+              <p className="text-xs font-semibold text-dark-400 mb-1 uppercase tracking-wider">Summary</p>
+              <p className="text-sm text-dark-200">{transcript.summary}</p>
+            </div>
+          )}
+          <div className="space-y-2">
+            {(transcript?.entries || []).map((entry, idx) => {
+              const speaker = entry.speaker || entry.role || 'speaker';
+              const text = entry.text || entry.message || entry.content || '';
+              const isAi = /ai|agent|assistant|bot/i.test(speaker);
+              return (
+                <div key={idx} className={`flex ${isAi ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[80%] p-3 rounded-xl text-sm ${isAi ? 'bg-brand-500/10 text-dark-200' : 'bg-dark-700/40 text-dark-200'}`}>
+                    <p className="text-[10px] uppercase tracking-wider text-dark-500 mb-1">{speaker}</p>
+                    {text}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
