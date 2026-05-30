@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Building2, Key, Bell, Globe, Shield, Loader2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -26,6 +26,16 @@ export default function SettingsPage() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [notifications, setNotifications] = useState(notificationDefaults);
+
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        full_name: user.full_name ?? '',
+        email: user.email ?? '',
+        phone: user.phone ?? '',
+      });
+    }
+  }, [user]);
 
   const saveProfile = async () => {
     if (!profile.full_name.trim()) {
