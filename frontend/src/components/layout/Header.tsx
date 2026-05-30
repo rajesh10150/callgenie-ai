@@ -12,17 +12,29 @@ interface HeaderProps {
 export default function Header({ title, subtitle }: HeaderProps) {
   const { user, logout } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unread, setUnread] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
       }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  const notifications = [
+    { id: 1, text: 'Campaign "Q1 Real Estate" completed', time: '2h ago' },
+    { id: 2, text: 'New lead imported from CSV', time: '5h ago' },
+    { id: 3, text: 'Weekly summary report is ready', time: '1d ago' },
+  ];
 
   const initials = user
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -47,10 +59,29 @@ export default function Header({ title, subtitle }: HeaderProps) {
         </div>
 
         {/* Notifications */}
-        <button className="relative p-2 rounded-xl text-dark-400 hover:text-dark-200 hover:bg-dark-800/60 transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-brand-500 rounded-full" />
-        </button>
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => { setShowNotifications(!showNotifications); setUnread(false); }}
+            className="relative p-2 rounded-xl text-dark-400 hover:text-dark-200 hover:bg-dark-800/60 transition-colors"
+          >
+            <Bell className="w-5 h-5" />
+            {unread && <span className="absolute top-1 right-1 w-2 h-2 bg-brand-500 rounded-full" />}
+          </button>
+
+          {showNotifications && (
+            <div className="absolute right-0 top-full mt-2 w-72 glass-card p-2 z-50">
+              <div className="px-3 py-2 border-b border-dark-700/50 mb-1">
+                <p className="text-sm font-medium text-dark-100">Notifications</p>
+              </div>
+              {notifications.map(n => (
+                <div key={n.id} className="px-3 py-2 rounded-lg hover:bg-dark-800/60 transition-colors">
+                  <p className="text-sm text-dark-200">{n.text}</p>
+                  <p className="text-xs text-dark-500 mt-0.5">{n.time}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* User Menu */}
         <div className="relative" ref={menuRef}>
