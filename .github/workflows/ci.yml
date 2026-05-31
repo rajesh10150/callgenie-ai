@@ -39,5 +39,8 @@ jobs:
       - name: Lint frontend
         run: cd frontend && npm run lint
 
+      - name: Test frontend (95% coverage gate)
+        run: cd frontend && npm run test:coverage
+
       - name: Build frontend
         run: cd frontend && npm run build
