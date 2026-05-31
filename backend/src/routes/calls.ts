@@ -134,6 +134,7 @@ router.post('/initiate', async (req: AuthenticatedRequest, res: Response) => {
       to: lead.phone,
       from: config.twilio.phoneNumber,
       webhookUrl: `${webhookBase}/api/v1/webhooks/twilio/voice`,
+      statusCallbackUrl: `${webhookBase}/api/v1/webhooks/twilio/status`,
       recordingEnabled: true,
       voicemailDetection: true,
       timeout: 30,
