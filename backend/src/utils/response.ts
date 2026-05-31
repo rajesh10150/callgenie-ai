@@ -43,8 +43,10 @@ export const sendError = (
 };
 
 export const parsePagination = (query: { page?: string; limit?: string }) => {
-  const page = Math.max(1, parseInt(query.page || '1', 10));
-  const limit = Math.min(100, Math.max(1, parseInt(query.limit || '25', 10)));
+  const pageRaw = parseInt(query.page || '1', 10);
+  const limitRaw = parseInt(query.limit || '25', 10);
+  const page = Math.max(1, Number.isNaN(pageRaw) ? 1 : pageRaw);
+  const limit = Math.min(100, Math.max(1, Number.isNaN(limitRaw) ? 25 : limitRaw));
   const offset = (page - 1) * limit;
   return { page, limit, offset };
 };
