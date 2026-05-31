@@ -12,6 +12,7 @@ interface CallConfig {
   to: string;
   from: string;
   webhookUrl: string;
+  statusCallbackUrl: string;
   recordingEnabled: boolean;
   voicemailDetection: boolean;
   timeout: number;
@@ -51,7 +52,7 @@ export class VoiceEngine {
       record: callConfig.recordingEnabled,
       machineDetection: callConfig.voicemailDetection ? 'Enable' : 'DetectMessageEnd',
       timeout: callConfig.timeout,
-      statusCallback: `${callConfig.webhookUrl}/status`,
+      statusCallback: callConfig.statusCallbackUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
     });
 
