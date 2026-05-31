@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Upload, Download, Filter, Mail, Phone as PhoneIcon, Building2, Star, Loader2 } from 'lucide-react';
+import { Plus, Search, Upload, Download, Filter, Mail, Phone as PhoneIcon, PhoneCall, Building2, Star, Loader2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
@@ -98,6 +98,7 @@ export default function LeadsPage() {
   const [form, setForm] = useState<LeadForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [callingId, setCallingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const flash = (type: 'success' | 'error', text: string) => {
@@ -184,11 +185,36 @@ export default function LeadsPage() {
     }
   };
 
+  const handleCall = async (lead: LeadRecord) => {
+    const id = lead.id as string;
+    const name = `${lead.first_name as string}${lead.last_name ? ' ' + (lead.last_name as string) : ''}`.trim();
+    setCallingId(id);
+    try {
+      const res = await api.post<{ status: string }>('/calls/initiate', { lead_id: id });
+      if (res.success) {
+        const demo = res.data?.status === 'demo';
+        flash(
+          'success',
+          demo
+            ? `Demo call created for ${name}. Add Twilio credentials to place real calls.`
+            : `Calling ${name}... Track status on the Calls page.`
+        );
+      } else {
+        flash('error', res.error?.message || 'Failed to start call');
+      }
+    } catch {
+      flash('error', 'Unable to connect to server. Please try again.');
+    } finally {
+      setCallingId(null);
+    }
+  };
+
+  const query = searchQuery.toLowerCase();
   const filteredLeads = leads.filter(l => {
     const matchesSearch =
-      `${l.first_name} ${l.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.company.toLowerCase().includes(searchQuery.toLowerCase());
+      `${l.first_name || ''} ${l.last_name || ''}`.toLowerCase().includes(query) ||
+      (l.email || '').toLowerCase().includes(query) ||
+      (l.company || '').toLowerCase().includes(query);
     const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -200,11 +226,11 @@ export default function LeadsPage() {
       render: (lead: LeadRecord) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500/30 to-purple-500/30 flex items-center justify-center text-xs font-semibold text-brand-300">
-            {(lead.first_name as string)[0]}{(lead.last_name as string)[0]}
+            {((lead.first_name as string) || '?')[0]}{((lead.last_name as string) || '')[0] || ''}
           </div>
           <div>
-            <div className="font-medium text-dark-100">{lead.first_name as string} {lead.last_name as string}</div>
-            <div className="text-xs text-dark-500">{lead.company as string}</div>
+            <div className="font-medium text-dark-100">{lead.first_name as string} {(lead.last_name as string) || ''}</div>
+            <div className="text-xs text-dark-500">{(lead.company as string) || '—'}</div>
           </div>
         </div>
       ),
@@ -216,11 +242,11 @@ export default function LeadsPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-1 text-xs text-dark-400">
             <Mail className="w-3 h-3" />
-            {lead.email as string}
+            {(lead.email as string) || '—'}
           </div>
           <div className="flex items-center gap-1 text-xs text-dark-400">
             <PhoneIcon className="w-3 h-3" />
-            {lead.phone as string}
+            {(lead.phone as string) || '—'}
           </div>
         </div>
       ),
@@ -247,7 +273,7 @@ export default function LeadsPage() {
       header: 'Source',
       render: (lead: LeadRecord) => (
         <span className="text-xs px-2 py-1 rounded-lg bg-dark-700/50 text-dark-300">
-          {(lead.source as string).replace('_', ' ')}
+          {((lead.source as string) || 'manual').replace('_', ' ')}
         </span>
       ),
     },
@@ -256,6 +282,23 @@ export default function LeadsPage() {
       header: 'Added',
       render: (lead: LeadRecord) => (
         <span className="text-dark-400">{formatDate(lead.created_at as string)}</span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (lead: LeadRecord) => (
+        <button
+          onClick={() => handleCall(lead)}
+          disabled={callingId === (lead.id as string)}
+          className="btn-primary flex items-center gap-1.5 text-xs !py-1.5 !px-3 disabled:opacity-60"
+          title="Call this lead"
+        >
+          {callingId === (lead.id as string)
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <PhoneCall className="w-3.5 h-3.5" />}
+          Call
+        </button>
       ),
     },
   ];

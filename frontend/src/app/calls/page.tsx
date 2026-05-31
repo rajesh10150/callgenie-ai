@@ -29,6 +29,37 @@ const sentimentConfig = {
   negative: { icon: ThumbsDown, color: 'text-red-400', bg: 'bg-red-500/10' },
 };
 
+interface NestedLead {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+}
+
+// Normalizes both the demo fallback shape and the real API record shape
+// (which nests lead/campaign data and uses duration_seconds, to_number, etc.)
+function normalizeCall(raw: Record<string, unknown>) {
+  const lead = (raw.leads as NestedLead | null) || undefined;
+  const campaign = (raw.campaigns as { name?: string } | null) || undefined;
+  const leadName =
+    (raw.lead_name as string) ||
+    [lead?.first_name, lead?.last_name].filter(Boolean).join(' ').trim() ||
+    'Unknown Lead';
+  return {
+    id: String(raw.id ?? ''),
+    lead_name: leadName,
+    campaign: (raw.campaign as string) || campaign?.name || '—',
+    phone: (raw.phone as string) || (raw.to_number as string) || lead?.phone || '—',
+    status: (raw.status as string) || 'queued',
+    sentiment: (raw.sentiment as string) || 'neutral',
+    qualified: Boolean(raw.qualified ?? raw.lead_qualified),
+    ai_model: (raw.ai_model as string) || (raw.ai_model_used as string) || '—',
+    cost: Number(raw.cost) || 0,
+    duration: Number(raw.duration ?? raw.duration_seconds) || 0,
+    created_at: (raw.created_at as string) || new Date().toISOString(),
+    recording_url: (raw.recording_url as string) || undefined,
+  };
+}
+
 interface TranscriptEntry {
   speaker?: string;
   role?: string;
@@ -46,10 +77,11 @@ interface TranscriptData {
 export default function CallsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const { data: calls } = useApiData<typeof fallbackCalls>({
+  const { data: rawCalls } = useApiData<Record<string, unknown>[]>({
     endpoint: '/calls',
-    fallback: fallbackCalls,
+    fallback: fallbackCalls as unknown as Record<string, unknown>[],
   });
+  const calls = rawCalls.map(normalizeCall);
   const { notice, flash } = useNotice();
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptData | null>(null);
@@ -83,9 +115,10 @@ export default function CallsPage() {
     }
   };
 
+  const query = searchQuery.toLowerCase();
   const filteredCalls = calls.filter(c => {
-    const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.campaign.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = c.lead_name.toLowerCase().includes(query) ||
+      c.campaign.toLowerCase().includes(query);
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -130,7 +163,7 @@ export default function CallsPage() {
       {/* Call List */}
       <div className="space-y-3">
         {filteredCalls.map((call, i) => {
-          const sentiment = sentimentConfig[call.sentiment as keyof typeof sentimentConfig];
+          const sentiment = sentimentConfig[call.sentiment as keyof typeof sentimentConfig] || sentimentConfig.neutral;
           const SentimentIcon = sentiment.icon;
 
           return (
