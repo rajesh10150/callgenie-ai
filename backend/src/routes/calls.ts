@@ -114,16 +114,18 @@ router.post('/initiate', async (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
-    const { data: campaign } = await supabaseAdmin
-      .from('campaigns')
-      .select('*')
-      .eq('id', campaign_id)
-      .eq('org_id', req.user!.orgId)
-      .single();
+    if (campaign_id) {
+      const { data: campaign } = await supabaseAdmin
+        .from('campaigns')
+        .select('id')
+        .eq('id', campaign_id)
+        .eq('org_id', req.user!.orgId)
+        .single();
 
-    if (!campaign) {
-      sendError(res, 'NOT_FOUND', 'Campaign not found', 404);
-      return;
+      if (!campaign) {
+        sendError(res, 'NOT_FOUND', 'Campaign not found', 404);
+        return;
+      }
     }
 
     const callId = uuidv4();
@@ -145,11 +147,13 @@ router.post('/initiate', async (req: AuthenticatedRequest, res: Response) => {
       .insert({
         id: callId,
         org_id: req.user!.orgId,
-        campaign_id,
+        campaign_id: campaign_id || null,
         lead_id,
         twilio_call_sid: callSid,
         status: status === 'demo_mode' ? 'demo' : 'queued',
         direction: 'outbound',
+        from_number: config.twilio.phoneNumber || null,
+        to_number: lead.phone,
         started_at: new Date().toISOString(),
       })
       .select()
