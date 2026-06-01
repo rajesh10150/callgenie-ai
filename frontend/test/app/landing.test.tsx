@@ -16,5 +16,9 @@ describe('app/page (landing)', () => {
     expect(screen.getByText('Most Popular')).toBeInTheDocument();
     // CTA links
     expect(screen.getAllByText(/Start Free Trial|Get Started Free/).length).toBeGreaterThan(0);
+    // secondary CTA + trust microcopy + industries strip
+    expect(screen.getByText('See How It Works')).toBeInTheDocument();
+    expect(screen.getByText(/No credit card required/)).toBeInTheDocument();
+    expect(screen.getByText('Real Estate')).toBeInTheDocument();
   });
 });

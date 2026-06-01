@@ -111,15 +111,38 @@ export default function LandingPage() {
                   <ArrowRight className="w-5 h-5" />
                 </motion.button>
               </Link>
-              <Link href="/dashboard">
+              <a href="#features">
                 <motion.button
                   className="glass-button text-lg !px-8 !py-4"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  View Demo Dashboard
+                  See How It Works
                 </motion.button>
-              </Link>
+              </a>
+            </div>
+
+            <p className="text-sm text-dark-500 mt-6">
+              No credit card required · 30 free AI call minutes · Set up in minutes
+            </p>
+          </motion.div>
+
+          {/* Industries strip */}
+          <motion.div
+            className="mt-12 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+          >
+            <p className="text-xs uppercase tracking-widest text-dark-500 mb-4">
+              Built for outbound teams
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-dark-400 font-medium">
+              <span>Real Estate</span>
+              <span>Clinics</span>
+              <span>Agencies</span>
+              <span>EdTech</span>
+              <span>Insurance</span>
             </div>
           </motion.div>
 
