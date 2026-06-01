@@ -16,6 +16,8 @@ const customConfig = {
     '!src/**/*.d.ts',
     '!src/types/**',
     '!src/styles/**',
+    '!src/app/**/opengraph-image.tsx',
+    '!src/app/**/twitter-image.tsx',
   ],
   coverageDirectory: '<rootDir>/coverage',
   coverageReporters: ['text', 'text-summary', 'lcov', 'html'],

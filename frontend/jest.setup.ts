@@ -1,5 +1,12 @@
 import '@testing-library/jest-dom';
 
+// @vercel/analytics injects a browser script that is irrelevant to tests; stub
+// it so layout renders deterministically without touching the network.
+jest.mock('@vercel/analytics/react', () => ({
+  __esModule: true,
+  Analytics: () => null,
+}));
+
 // framer-motion renders DOM nodes with animation-only props that React warns
 // about in jsdom. Mock it to plain elements (stripping motion-only props) so
 // component markup still renders for assertions and coverage.
